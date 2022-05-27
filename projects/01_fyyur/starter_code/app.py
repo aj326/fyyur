@@ -48,24 +48,26 @@ class Venue(db.Model):
 
     genres = db.Column(db.String, nullable=False)
     seeking_talent = db.Column(db.Boolean, nullable=False)
-    seeking_description = db.Column(db.String, nullable=True, unique=False)
+    seeking_talent_description = db.Column(db.String, nullable=True, unique=False)
     # upcoming and past shows are the result of joining venues and artists. (venue_id,artist_id,show_id, show_date)
     # website_link, genres,  seeking_talent, seeking_description, upcoming, past
 
-    # TODO: implement any missing fields, as a database migration using Flask-Migrate
 
 
 class Artist(db.Model):
     __tablename__ = 'Artist'
 
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String)
-    city = db.Column(db.String(120))
-    state = db.Column(db.String(120))
-    phone = db.Column(db.String(120))
-    genres = db.Column(db.String(120))
-    image_link = db.Column(db.String(500))
-    facebook_link = db.Column(db.String(120))
+    name = db.Column(db.String,nullable=False,unique=True)
+    city = db.Column(db.String(120),nullable=False,)
+    state = db.Column(db.String(120),nullable=False,)
+    phone = db.Column(db.String(120),nullable=False,unique=True)
+    genres = db.Column(db.String(120),nullable=False)
+    image_link = db.Column(db.String(500),nullable=False,unique=True)
+    website = db.Column(db.String(120), nullable=True, unique=True)
+    facebook_link = db.Column(db.String(120),nullable=True,unique=True)
+    seeking_venue = db.Column(db.Boolean, nullable=False)
+    seeking_venue_description = db.Column(db.String, nullable=True, unique=False)
 
     # TODO: implement any missing fields, as a database migration using Flask-Migrate
 
