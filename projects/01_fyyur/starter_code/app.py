@@ -29,7 +29,7 @@ migrate = Migrate(app, db)
 # ----------------------------------------------------------------------------#
 shows = db.Table('Shows', db.Column('venue_id', db.Integer, db.ForeignKey('Venue.id'), primary_key=True),
                  db.Column('artist_id', db.Integer, db.ForeignKey('Artist.id'), primary_key=True),
-                 db.Column('date_time', db.DateTime, nullable=False), )
+                 db.Column('date_time', db.String(120), nullable=False), )
 
 
 class Venue(db.Model):
