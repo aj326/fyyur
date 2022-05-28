@@ -43,13 +43,12 @@ class Venue(db.Model):
     state = db.Column(db.String(120), nullable=False)
     address = db.Column(db.String(120), nullable=False)
     phone = db.Column(db.String(120), nullable=False, unique=True)
-    image_link = db.Column(db.String(500), nullable=False, unique=True)
-    facebook_link = db.Column(db.String(120), nullable=False, unique=True)
-    website = db.Column(db.String(120), nullable=False, unique=True)
-
+    image_link = db.Column(db.String(500), nullable=True, unique=True)
+    facebook_link = db.Column(db.String(120), nullable=True, unique=True)
+    website_link = db.Column(db.String(120), nullable=True, unique=True)
     genres = db.Column(db.String, nullable=False)
     seeking_talent = db.Column(db.Boolean, nullable=False)
-    seeking_talent_description = db.Column(db.String, nullable=True, unique=False)
+    seeking_description = db.Column(db.String, nullable=True, unique=False)
     artists = db.relationship('Artist', secondary=shows, backref=db.backref('venues', lazy=True))
     # upcoming and past shows are the result of joining venues and artists. (venue_id,artist_id,show_id, show_date)
     # website_link, genres,  seeking_talent, seeking_description, upcoming, past
@@ -62,13 +61,13 @@ class Artist(db.Model):
     name = db.Column(db.String, nullable=False, unique=True)
     city = db.Column(db.String(120), nullable=False, )
     state = db.Column(db.String(120), nullable=False, )
-    phone = db.Column(db.String(120), nullable=False, unique=True)
+    phone = db.Column(db.String(120), nullable=True, unique=True)
     genres = db.Column(db.String(120), nullable=False)
-    image_link = db.Column(db.String(500), nullable=False, unique=True)
-    website = db.Column(db.String(120), nullable=True, unique=True)
+    image_link = db.Column(db.String(500), nullable=True, unique=True)
+    website_link = db.Column(db.String(120), nullable=True, unique=True)
     facebook_link = db.Column(db.String(120), nullable=True, unique=True)
     seeking_venue = db.Column(db.Boolean, nullable=False)
-    seeking_venue_description = db.Column(db.String, nullable=True, unique=False)
+    seeking_description = db.Column(db.String, nullable=True, unique=False)
 
 
 # ----------------------------------------------------------------------------#
@@ -240,6 +239,23 @@ def create_venue_form():
 
 @app.route('/venues/create', methods=['POST'])
 def create_venue_submission():
+    form = VenueForm()
+    if not form.validate_on_submit():
+        flash('Error in submission')
+        return render_template('forms/new_venue.html', form=form)
+    data1 = {
+        "name": "The Musical Hop",
+        "genres": ["Jazz", "Reggae", "Swing", "Classical", "Folk"],
+        "address": "1015 Folsom Street",
+        "city": "San Francisco",
+        "state": "CA",
+        "phone": "123-123-1234",
+        "website": "https://www.themusicalhop.com",
+        "facebook_link": "https://www.facebook.com/TheMusicalHop",
+        "seeking_talent": True,
+        "seeking_description": "We are on the lookout for a local artist to play every two weeks. Please call us.",
+        "image_link": "https://images.unsplash.com/photo-1543900694-133f37abaaa5?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=400&q=60",}
+    print(form.phone.data)
     # TODO: insert form data as a new Venue record in the db, instead
     # TODO: modify data to be the data object returned from db insertion
 
