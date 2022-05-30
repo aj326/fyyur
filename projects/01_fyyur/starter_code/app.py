@@ -16,6 +16,7 @@ from logging import Formatter, FileHandler
 from flask_wtf import Form
 from forms import *
 from flask_migrate import Migrate
+from sqlalchemy import exc
 
 # ----------------------------------------------------------------------------#
 # App Config.
@@ -72,6 +73,8 @@ class Artist(db.Model):
     seeking_venue = db.Column(db.Boolean, nullable=False)
     seeking_description = db.Column(db.String, nullable=True, unique=False)
 
+    def __repr__(self):
+        return f'<Artist {self.id}:{[self.name,  self.city, self.state, self.phone, self.image_link, self.facebook_link, self.website, self.genres, self.seeking_venue, self.seeking_description]}'
 
 # ----------------------------------------------------------------------------#
 # Filters.
@@ -242,45 +245,28 @@ def create_venue_form():
 
 @app.route('/venues/create', methods=['POST'])
 def create_venue_submission():
+    # data1 = {
+    #     "name": "The Musical Hop",
+    #     "genres": ["Jazz", "Reggae", "Swing", "Classical", "Folk"],
+    #     "address": "1015 Folsom Street",
+    #     "city": "San Francisco",
+    #     "state": "CA",
+    #     "phone": "123-123-1234",
+    #     "website": "https://www.themusicalhop.com",
+    #     "facebook_link": "https://www.facebook.com/TheMusicalHop",
+    #     "seeking_talent": True,
+    #     "seeking_description": "We are on the lookout for a local artist to play every two weeks. Please call us.",
+    #     "image_link": "https://images.unsplash.com/photo-1543900694-133f37abaaa5?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=400&q=60", }
+    # DONE: insert form data as a new Venue record in the db, instead
+    # DONE: modify data to be the data object returned from db insertion
+
     form = VenueForm()
-    # id = db.Column(db.Integer, primary_key=True)
-    # name = db.Column(db.String, nullable=False, unique=True)
-    # city = db.Column(db.String(120), nullable=False)
-    # state = db.Column(db.String(120), nullable=False)
-    # address = db.Column(db.String(120), nullable=False)
-    # phone = db.Column(db.String(120), nullable=False, unique=True)
-    # image_link = db.Column(db.String(500), nullable=True, unique=True)
-    # facebook_link = db.Column(db.String(120), nullable=True, unique=True)
-    # website_link = db.Column(db.String(120), nullable=True, unique=True)
-    # genres = db.Column(db.String, nullable=False)
-    # seeking_talent = db.Column(db.Boolean, nullable=False)
-    # seeking_description = db.Column(db.String, nullable=True, unique=False)
-    # artists = db.relationship('Artist', secondary=shows, backref=db.backref('venues', lazy=True))
-    # venue = Venue(name=form.name.data,
-    #               address=form.address.data,phone=form.phone.data,
-    #               image_link=form.image_link.data,facebook_link=form.facebook_link.data,
-    #               website=form.website_link.data,
-    #               genres=form.name.data,seeking_talent=form.seeking_talent.data,seeking_description=form.seeking_description.data)
-    # # form.
+
     if not form.validate_on_submit():
         flash('Error in submission')
         return render_template('forms/new_venue.html', form=form)
 
-    data1 = {
-        "name": "The Musical Hop",
-        "genres": ["Jazz", "Reggae", "Swing", "Classical", "Folk"],
-        "address": "1015 Folsom Street",
-        "city": "San Francisco",
-        "state": "CA",
-        "phone": "123-123-1234",
-        "website": "https://www.themusicalhop.com",
-        "facebook_link": "https://www.facebook.com/TheMusicalHop",
-        "seeking_talent": True,
-        "seeking_description": "We are on the lookout for a local artist to play every two weeks. Please call us.",
-        "image_link": "https://images.unsplash.com/photo-1543900694-133f37abaaa5?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=400&q=60", }
-    # DONE: insert form data as a new Venue record in the db, instead
-    # DONE: modify data to be the data object returned from db insertion
-    error=False
+    error = False
     try:
         venue = Venue(name=form.name.data, city=form.city.data, state=form.state.data,
                       address=form.address.data, phone=form.phone.data,
@@ -293,7 +279,7 @@ def create_venue_submission():
         db.session.commit()
         # on successful db insert, flash success
         flash('Venue ' + form.name.data + ' was successfully listed!')
-    except:
+    except exc.SQLAlchemyError:
         error = True
         db.session.rollback()
         print(sys.exc_info())
@@ -503,12 +489,38 @@ def create_artist_submission():
     # called upon submitting the new artist listing form
     # TODO: insert form data as a new Venue record in the db, instead
     # TODO: modify data to be the data object returned from db insertion
+    form = ArtistForm()
+    if not form.validate_on_submit():
+        flash('Error in submission')
+        print(form.errors)
+        return render_template('forms/new_artist.html', form=form)
+    error = False
+    try:
+        artist = Artist(name=form.name.data, city=form.city.data,
+                        state=form.state.data,
+                        phone=form.phone.data,
+                        image_link=form.image_link.data, facebook_link=form.facebook_link.data,
+                        website=form.website_link.data,
+                        genres=form.genres.data, seeking_venue=form.seeking_venue.data,
+                        seeking_description=form.seeking_description.data)
+        print(artist)
+        db.session.add(artist)
+        db.session.commit()
+        # on successful db insert, flash success
+        flash('Artist ' + form.name.data + ' was successfully listed!')
+    except exc.SQLAlchemyError:
+        error = True
+        db.session.rollback()
+        print(sys.exc_info())
+        # DONE: on unsuccessful db insert, flash an error instead.
+        flash('An error occurred. Artist ' + form.name.data + ' could not be listed.')
+    finally:
+        db.session.close()
+    if not error:
+        return render_template('pages/home.html')
+    else:
+        abort(500)
 
-    # on successful db insert, flash success
-    flash('Artist ' + request.form['name'] + ' was successfully listed!')
-    # TODO: on unsuccessful db insert, flash an error instead.
-    # e.g., flash('An error occurred. Artist ' + data.name + ' could not be listed.')
-    return render_template('pages/home.html')
 
 
 #  Shows
