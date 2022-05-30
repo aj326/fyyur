@@ -8,14 +8,21 @@ from wtforms.validators import DataRequired, AnyOf, URL, Length, Regexp, Validat
 def validate_phone(form, field):
     if not re.search(r'^[1-9]\d{2}-\d{3}-\d{4}$', field.data):
         raise ValidationError("Error: Phone number should only contain digits (xxx-xxx-xxxx)")
-
-
+def validate_url(form, field):
+    if field.data:
+        URL(message="Error: URL must be in the form of http[s]://[www.]example.com")
+def validate_facebook(form, field):
+    if field.data:
+        if not re.search(r'^https://www.facebook.com/.+$', field.data):
+            raise ValidationError("Error: Facebook link should start with https://www.facebook.com (e.g. https://www.facebook.com/XXX)")
 class ShowForm(Form):
     artist_id = StringField(
-        'artist_id'
+        'artist_id',        validators=[DataRequired()],
+
     )
     venue_id = StringField(
-        'venue_id'
+        'venue_id',        validators=[DataRequired()],
+
     )
     start_time = DateTimeField(
         'start_time',
@@ -96,7 +103,7 @@ class VenueForm(Form):
         'phone', validators=[DataRequired(), validate_phone]
     )
     image_link = StringField(
-        'image_link', validators=[URL(message="Error: URL must be in the form of http[s]://[www.]example.com")]
+        'image_link', validators=[validate_url]
     )
     genres = SelectMultipleField(
         'genres', validators=[DataRequired()],
@@ -123,10 +130,10 @@ class VenueForm(Form):
         ]
     )
     facebook_link = StringField(
-        'facebook_link', validators=[URL(message="Error: URL must be in the form of http[s]://[www.]example.com")]
+        'facebook_link', validators=[validate_url,validate_facebook]
     )
     website_link = StringField(
-        'website_link',validators=[URL(message="Error: URL must be in the form of http[s]://[www.]example.com")]
+        'website_link', validators=[validate_url]
     )
 
     seeking_talent = BooleanField('seeking_talent')
@@ -203,7 +210,9 @@ class ArtistForm(Form):
         'phone', validators=[DataRequired(), validate_phone]
     )
     image_link = StringField(
-        'image_link',validators=[URL(message="Error: URL must be in the form of http[s]://[www.]example.com")]
+        # 'image_link',validators=[URL(message="Error: URL must be in the form of http[s]://[www.]example.com")]
+        'image_link', validators=[validate_url]
+
     )
     genres = SelectMultipleField(
         'genres', validators=[DataRequired()],
@@ -230,11 +239,14 @@ class ArtistForm(Form):
         ]
     )
     facebook_link = StringField(
-        'facebook_link', validators=[URL(message="Error: URL must be in the form of http[s]://[www.]example.com")]
+        # 'facebook_link', validators=[URL(message="Error: URL must be in the form of http[s]://[www.]example.com")]
+    'facebook_link', validators = [validate_url,validate_facebook]
+
     )
 
     website_link = StringField(
-        'website_link', validators=[URL(message="Error: URL must be in the form of http[s]://[www.]example.com")]
+    'website_link', validators=[validate_url]
+
     )
 
     seeking_venue = BooleanField('seeking_venue')
