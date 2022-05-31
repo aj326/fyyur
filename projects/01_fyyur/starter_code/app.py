@@ -8,6 +8,7 @@ import sys
 import dateutil.parser
 import babel
 import jsonify as jsonify
+import sqlalchemy
 from flask import Flask, render_template, request, Response, flash, redirect, url_for, abort
 from flask_moment import Moment
 from flask_sqlalchemy import SQLAlchemy
@@ -31,9 +32,6 @@ migrate = Migrate(app, db)
 # ----------------------------------------------------------------------------#
 # Models.
 # ----------------------------------------------------------------------------#
-shows = db.Table('Shows', db.Column('venue_id', db.Integer, db.ForeignKey('Venue.id'), primary_key=True),
-                 db.Column('artist_id', db.Integer, db.ForeignKey('Artist.id'), primary_key=True),
-                 db.Column('date_time', db.String(120), nullable=False), )
 
 
 class Venue(db.Model):
@@ -50,8 +48,7 @@ class Venue(db.Model):
     genres = db.Column(db.String, nullable=False)
     seeking_talent = db.Column(db.Boolean, nullable=False)
     seeking_description = db.Column(db.String, nullable=True, unique=False)
-    artists = db.relationship('Artist', secondary=shows, backref=db.backref('venues', lazy=True))
-
+    shows = db.relationship('Show', backref='Venue', lazy=True)
     # upcoming and past shows are the result of joining venues and artists. (venue_id,artist_id,show_id, show_date)
     # website_link, genres,  seeking_talent, seeking_description, upcoming, past
     def __repr__(self):
@@ -72,10 +69,18 @@ class Artist(db.Model):
     facebook_link = db.Column(db.String(120), nullable=True, unique=False)
     seeking_venue = db.Column(db.Boolean, nullable=False)
     seeking_description = db.Column(db.String, nullable=True, unique=False)
-
+    shows = db.relationship('Show', backref='Artist', lazy=True)
     def __repr__(self):
-        return f'<Artist {self.id}:{[self.name,  self.city, self.state, self.phone, self.image_link, self.facebook_link, self.website, self.genres, self.seeking_venue, self.seeking_description]}'
+        return f'<Artist {self.id}:{[self.name, self.city, self.state, self.phone, self.image_link, self.facebook_link, self.website, self.genres, self.seeking_venue, self.seeking_description]}'
 
+class Show(db.Model):
+    __tablename__ = 'Show'
+    id = db.Column(db.Integer, primary_key=True)
+    start_time = db.Column(db.DateTime, nullable=False)
+    artist_id = db.Column(db.Integer, db.ForeignKey(Artist.id), nullable=False)
+    venue_id = db.Column(db.Integer, db.ForeignKey(Venue.id), nullable=False)
+    def __repr__(self):
+        return f'<Artist {self.id}:{[self.venue_id,self.artist_id,self.start_time]}'
 # ----------------------------------------------------------------------------#
 # Filters.
 # ----------------------------------------------------------------------------#
@@ -522,7 +527,6 @@ def create_artist_submission():
         abort(500)
 
 
-
 #  Shows
 #  ----------------------------------------------------------------
 
@@ -580,13 +584,36 @@ def create_shows():
 def create_show_submission():
     # called to create new shows in the db, upon submitting new show listing form
     # TODO: insert form data as a new Show record in the db, instead
-
-    # on successful db insert, flash success
-    flash('Show was successfully listed!')
-    # TODO: on unsuccessful db insert, flash an error instead.
-    # e.g., flash('An error occurred. Show could not be listed.')
-    # see: http://flask.pocoo.org/docs/1.0/patterns/flashing/
-    return render_template('pages/home.html')
+    form = ShowForm()
+    error = False
+    # db.Column('venue_id', db.Integer, db.ForeignKey('Venue.id'), primary_key=True),
+    # db.Column('artist_id', db.Integer, db.ForeignKey('Artist.id'), primary_key=True),
+    # db.Column('date_time', db.String(120), nullable=False), )
+    try:
+        show=Show(venue_id=form.venue_id.data, artist_id=form.artist_id.data,
+             start_time=form.start_time.data)
+        db.session.add(show)
+        db.session.commit()
+        # on successful db insert, flash success
+        print(show)
+        flash('Show was successfully listed!')
+    except exc.SQLAlchemyError:
+        error = True
+        db.session.rollback()
+        print(sys.exc_info())
+        # DONE: on unsuccessful db insert, flash an error instead.
+        v = Venue.query.get(form.venue_id.data)
+        a = Artist.query.get(form.artist_id.data)
+        error_msg = ""
+        if not v: error_msg+="Venue with id "+form.venue_id.data+" Does not exist. "
+        if not a: error_msg += "Artist with id " + form.artist_id.data + " Does not exist. "
+        flash("An error occurred. Show could not be listed: "+error_msg)
+    finally:
+        db.session.close()
+    if not error:
+        return render_template('pages/home.html')
+    else:
+        abort(500)
 
 
 @app.errorhandler(404)
