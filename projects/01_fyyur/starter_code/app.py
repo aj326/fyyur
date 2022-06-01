@@ -3,89 +3,20 @@
 # ----------------------------------------------------------------------------#
 
 import json
-import sys
-
-import dateutil.parser
-import babel
-import jsonify as jsonify
-import sqlalchemy
-from flask import Flask, render_template, request, Response, flash, redirect, url_for, abort
-from flask_moment import Moment
-from flask_sqlalchemy import SQLAlchemy
 import logging
+import sys
 from logging import Formatter, FileHandler
-from flask_wtf import Form
-from forms import *
-from flask_migrate import Migrate
+
+import babel
+import dateutil.parser
+from flask import render_template, request, flash, redirect, url_for, abort
 from sqlalchemy import exc
 
+from forms import *
 # ----------------------------------------------------------------------------#
 # App Config.
 # ----------------------------------------------------------------------------#
-
-app = Flask(__name__)
-moment = Moment(app)
-app.config.from_object('config')
-db = SQLAlchemy(app)
-migrate = Migrate(app, db)
-
-
-# ----------------------------------------------------------------------------#
-# Models.
-# ----------------------------------------------------------------------------#
-
-
-class Venue(db.Model):
-    __tablename__ = 'Venue'
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String, nullable=False, unique=True)
-    city = db.Column(db.String(120), nullable=False)
-    state = db.Column(db.String(120), nullable=False)
-    address = db.Column(db.String(120), nullable=False)
-    phone = db.Column(db.String(120), nullable=False, unique=True)
-    image_link = db.Column(db.String(500), nullable=True, unique=False)
-    facebook_link = db.Column(db.String(120), nullable=True, unique=False)
-    website = db.Column(db.String(120), nullable=True, unique=False)
-    genres = db.Column(db.String, nullable=False)
-    seeking_talent = db.Column(db.Boolean, nullable=False)
-    seeking_description = db.Column(db.String, nullable=True, unique=False)
-    shows = db.relationship('Show', backref='Venue', lazy=True)
-
-    # upcoming and past shows are the result of joining venues and artists. (venue_id,artist_id,show_id, show_date)
-    # website_link, genres,  seeking_talent, seeking_description, upcoming, past
-    def __repr__(self):
-        return f'<Venue {self.id}:{[self.name, self.address, self.city, self.state, self.phone, self.image_link, self.facebook_link, self.website, self.genres, self.seeking_talent, self.seeking_description]}'
-
-
-class Artist(db.Model):
-    __tablename__ = 'Artist'
-
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String, nullable=False, unique=True)
-    city = db.Column(db.String(120), nullable=False, )
-    state = db.Column(db.String(120), nullable=False, )
-    phone = db.Column(db.String(120), nullable=True, unique=True)
-    genres = db.Column(db.String(120), nullable=False)
-    image_link = db.Column(db.String(500), nullable=True, unique=False)
-    website = db.Column(db.String(120), nullable=True, unique=False)
-    facebook_link = db.Column(db.String(120), nullable=True, unique=False)
-    seeking_venue = db.Column(db.Boolean, nullable=False)
-    seeking_description = db.Column(db.String, nullable=True, unique=False)
-    shows = db.relationship('Show', backref='Artist', lazy=True)
-
-    def __repr__(self):
-        return f'<Artist {self.id}:{[self.name, self.city, self.state, self.phone, self.image_link, self.facebook_link, self.website, self.genres, self.seeking_venue, self.seeking_description]}'
-
-
-class Show(db.Model):
-    __tablename__ = 'Show'
-    id = db.Column(db.Integer, primary_key=True)
-    start_time = db.Column(db.DateTime, nullable=False)
-    artist_id = db.Column(db.Integer, db.ForeignKey(Artist.id), nullable=False)
-    venue_id = db.Column(db.Integer, db.ForeignKey(Venue.id), nullable=False)
-
-    def __repr__(self):
-        return f'<Artist {self.id}:{[self.venue_id, self.artist_id, self.start_time]}'
+from starter_code.models import Venue, Artist, Show, app, db
 
 
 # ----------------------------------------------------------------------------#
@@ -94,10 +25,10 @@ class Show(db.Model):
 
 def format_datetime(value, format='medium'):
     # https://stackoverflow.com/a/63295801
-    if isinstance(value,str):
+    if isinstance(value, str):
         date = dateutil.parser.parse(value)
     else:
-        date=value
+        date = value
     if format == 'full':
         format = "EEEE MMMM, d, y 'at' h:mma"
     elif format == 'medium':
@@ -163,17 +94,28 @@ def venues():
 
 @app.route('/venues/search', methods=['POST'])
 def search_venues():
-    # TODO: implement search on venues with partial string search. Ensure it is case-insensitive.
-    # seach for Hop should return "The Musical Hop".
+    # DONE: implement search on venues with partial string search. Ensure it is case-insensitive.
+    # search for Hop should return "The Musical Hop".
     # search for "Music" should return "The Musical Hop" and "Park Square Live Music & Coffee"
-    response = {
-        "count": 1,
-        "data": [{
-            "id": 2,
-            "name": "The Dueling Pianos Bar",
-            "num_upcoming_shows": 0,
-        }]
-    }
+    search_term = f"%{request.form.get('search_term', '')}%"
+    # print(search_term)
+    search_result = Venue.query.filter(Venue.name.ilike(search_term)).all()
+    print(len(search_result))
+    data = []
+    for result in search_result:
+        data.append({'id': result.id,
+                     'name': result.name,
+                     'num_upcoming_shows': len(result.shows)})
+    response = {'count': len(search_result),
+                'data': data}
+    # response = {
+    #     "count": 1,
+    #     "data": [{
+    #         "id": 2,
+    #         "name": "The Dueling Pianos Bar",
+    #         "num_upcoming_shows": 0,
+    #     }]
+    # }
     return render_template('pages/search_venues.html', results=response,
                            search_term=request.form.get('search_term', ''))
 
@@ -181,86 +123,130 @@ def search_venues():
 @app.route('/venues/<int:venue_id>')
 def show_venue(venue_id):
     # shows the venue page with the given venue_id
-    # TODO: replace with real venue data from the venues table, using venue_id
-    data1 = {
-        "id": 1,
-        "name": "The Musical Hop",
-        "genres": ["Jazz", "Reggae", "Swing", "Classical", "Folk"],
-        "address": "1015 Folsom Street",
-        "city": "San Francisco",
-        "state": "CA",
-        "phone": "123-123-1234",
-        "website": "https://www.themusicalhop.com",
-        "facebook_link": "https://www.facebook.com/TheMusicalHop",
-        "seeking_talent": True,
-        "seeking_description": "We are on the lookout for a local artist to play every two weeks. Please call us.",
-        "image_link": "https://images.unsplash.com/photo-1543900694-133f37abaaa5?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=400&q=60",
-        "past_shows": [{
-            "artist_id": 4,
-            "artist_name": "Guns N Petals",
-            "artist_image_link": "https://images.unsplash.com/photo-1549213783-8284d0336c4f?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=300&q=80",
-            "start_time": "2019-05-21T21:30:00.000Z"
-        }],
-        "upcoming_shows": [],
-        "past_shows_count": 1,
-        "upcoming_shows_count": 0,
+    # DONE: replace with real venue data from the venues table, using venue_id
+    venue = Venue.query.get(venue_id)
+    past_shows = []
+    future_and_present_shows = []
+    for show in venue.shows:
+        date = show.start_time
+        if isinstance(show.start_time, str):
+            date = dateutil.parser.parse(show.start_time)
+        if date < datetime.now():
+            # past show
+            past_shows.append({
+                "artist_id": show.artist_id,
+                "artist_name": Artist.query.get(show.artist_id).name,
+                "artist_image_link": Artist.query.get(show.artist_id).image_link,
+                "start_time": show.start_time
+            })
+        else:
+            future_and_present_shows.append({
+                "artist_id": show.artist_id,
+                "artist_name": Artist.query.get(show.artist_id).name,
+                "artist_image_link": Artist.query.get(show.artist_id).image_link,
+                "start_time": show.start_time})
+    # print(json.dumps(''))
+    print(json.loads(venue.genres))
+    # print(venue.genres)
+    # print(len(venue.genres[1:-1].split(', ')))
+    # print(venue.genres[1:-1].split(', '),type(venue.genres),)
+    result = {
+        "id": venue.id,
+        "name": venue.name,
+        "genres": json.loads(venue.genres),
+        "address": venue.address,
+        "city": venue.city,
+        "state": venue.state,
+        "phone": venue.phone,
+        "website": venue.website,
+        "facebook_link": venue.facebook_link,
+        "seeking_talent": venue.seeking_talent,
+        "seeking_description": venue.seeking_description,
+        "image_link": venue.image_link,
+        "past_shows": past_shows,
+        "upcoming_shows": future_and_present_shows,
+        "past_shows_count": len(past_shows),
+        "upcoming_shows_count": len(future_and_present_shows),
     }
-    data2 = {
-        "id": 2,
-        "name": "The Dueling Pianos Bar",
-        "genres": ["Classical", "R&B", "Hip-Hop"],
-        "address": "335 Delancey Street",
-        "city": "New York",
-        "state": "NY",
-        "phone": "914-003-1132",
-        "website": "https://www.theduelingpianos.com",
-        "facebook_link": "https://www.facebook.com/theduelingpianos",
-        "seeking_talent": False,
-        "image_link": "https://images.unsplash.com/photo-1497032205916-ac775f0649ae?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=750&q=80",
-        "past_shows": [],
-        "upcoming_shows": [],
-        "past_shows_count": 0,
-        "upcoming_shows_count": 0,
-    }
-    data3 = {
-        "id": 3,
-        "name": "Park Square Live Music & Coffee",
-        "genres": ["Rock n Roll", "Jazz", "Classical", "Folk"],
-        "address": "34 Whiskey Moore Ave",
-        "city": "San Francisco",
-        "state": "CA",
-        "phone": "415-000-1234",
-        "website": "https://www.parksquarelivemusicandcoffee.com",
-        "facebook_link": "https://www.facebook.com/ParkSquareLiveMusicAndCoffee",
-        "seeking_talent": False,
-        "image_link": "https://images.unsplash.com/photo-1485686531765-ba63b07845a7?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=747&q=80",
-        "past_shows": [{
-            "artist_id": 5,
-            "artist_name": "Matt Quevedo",
-            "artist_image_link": "https://images.unsplash.com/photo-1495223153807-b916f75de8c5?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=334&q=80",
-            "start_time": "2019-06-15T23:00:00.000Z"
-        }],
-        "upcoming_shows": [{
-            "artist_id": 6,
-            "artist_name": "The Wild Sax Band",
-            "artist_image_link": "https://images.unsplash.com/photo-1558369981-f9ca78462e61?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=794&q=80",
-            "start_time": "2035-04-01T20:00:00.000Z"
-        }, {
-            "artist_id": 6,
-            "artist_name": "The Wild Sax Band",
-            "artist_image_link": "https://images.unsplash.com/photo-1558369981-f9ca78462e61?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=794&q=80",
-            "start_time": "2035-04-08T20:00:00.000Z"
-        }, {
-            "artist_id": 6,
-            "artist_name": "The Wild Sax Band",
-            "artist_image_link": "https://images.unsplash.com/photo-1558369981-f9ca78462e61?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=794&q=80",
-            "start_time": "2035-04-15T20:00:00.000Z"
-        }],
-        "past_shows_count": 1,
-        "upcoming_shows_count": 1,
-    }
-    data = list(filter(lambda d: d['id'] == venue_id, [data1, data2, data3]))[0]
-    return render_template('pages/show_venue.html', venue=data)
+    # data1 = {
+    #     "id": 1,
+    #     "name": "The Musical Hop",
+    #     "genres": ["Jazz", "Reggae", "Swing", "Classical", "Folk"],
+    #     "address": "1015 Folsom Street",
+    #     "city": "San Francisco",
+    #     "state": "CA",
+    #     "phone": "123-123-1234",
+    #     "website": "https://www.themusicalhop.com",
+    #     "facebook_link": "https://www.facebook.com/TheMusicalHop",
+    #     "seeking_talent": True,
+    #     "seeking_description": "We are on the lookout for a local artist to play every two weeks. Please call us.",
+    #     "image_link": "https://images.unsplash.com/photo-1543900694-133f37abaaa5?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=400&q=60",
+    #     "past_shows": [{
+    #         "artist_id": 4,
+    #         "artist_name": "Guns N Petals",
+    #         "artist_image_link": "https://images.unsplash.com/photo-1549213783-8284d0336c4f?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=300&q=80",
+    #         "start_time": "2019-05-21T21:30:00.000Z"
+    #     }],
+    #     "upcoming_shows": [],
+    #     "past_shows_count": 1,
+    #     "upcoming_shows_count": 0,
+    # }
+    # data2 = {
+    #     "id": 2,
+    #     "name": "The Dueling Pianos Bar",
+    #     "genres": ["Classical", "R&B", "Hip-Hop"],
+    #     "address": "335 Delancey Street",
+    #     "city": "New York",
+    #     "state": "NY",
+    #     "phone": "914-003-1132",
+    #     "website": "https://www.theduelingpianos.com",
+    #     "facebook_link": "https://www.facebook.com/theduelingpianos",
+    #     "seeking_talent": False,
+    #     "image_link": "https://images.unsplash.com/photo-1497032205916-ac775f0649ae?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=750&q=80",
+    #     "past_shows": [],
+    #     "upcoming_shows": [],
+    #     "past_shows_count": 0,
+    #     "upcoming_shows_count": 0,
+    # }
+    # data3 = {
+    #     "id": 3,
+    #     "name": "Park Square Live Music & Coffee",
+    #     "genres": ["Rock n Roll", "Jazz", "Classical", "Folk"],
+    #     "address": "34 Whiskey Moore Ave",
+    #     "city": "San Francisco",
+    #     "state": "CA",
+    #     "phone": "415-000-1234",
+    #     "website": "https://www.parksquarelivemusicandcoffee.com",
+    #     "facebook_link": "https://www.facebook.com/ParkSquareLiveMusicAndCoffee",
+    #     "seeking_talent": False,
+    #     "image_link": "https://images.unsplash.com/photo-1485686531765-ba63b07845a7?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=747&q=80",
+    #     "past_shows": [{
+    #         "artist_id": 5,
+    #         "artist_name": "Matt Quevedo",
+    #         "artist_image_link": "https://images.unsplash.com/photo-1495223153807-b916f75de8c5?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=334&q=80",
+    #         "start_time": "2019-06-15T23:00:00.000Z"
+    #     }],
+    #     "upcoming_shows": [{
+    #         "artist_id": 6,
+    #         "artist_name": "The Wild Sax Band",
+    #         "artist_image_link": "https://images.unsplash.com/photo-1558369981-f9ca78462e61?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=794&q=80",
+    #         "start_time": "2035-04-01T20:00:00.000Z"
+    #     }, {
+    #         "artist_id": 6,
+    #         "artist_name": "The Wild Sax Band",
+    #         "artist_image_link": "https://images.unsplash.com/photo-1558369981-f9ca78462e61?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=794&q=80",
+    #         "start_time": "2035-04-08T20:00:00.000Z"
+    #     }, {
+    #         "artist_id": 6,
+    #         "artist_name": "The Wild Sax Band",
+    #         "artist_image_link": "https://images.unsplash.com/photo-1558369981-f9ca78462e61?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=794&q=80",
+    #         "start_time": "2035-04-15T20:00:00.000Z"
+    #     }],
+    #     "past_shows_count": 1,
+    #     "upcoming_shows_count": 1,
+    # }
+    # data = list(filter(lambda d: d['id'] == venue_id, [data1, data2, data3]))[0]
+    return render_template('pages/show_venue.html', venue=result)
 
 
 #  Create Venue
@@ -297,13 +283,21 @@ def create_venue_submission():
 
     error = False
     try:
-        venue = Venue(name=form.name.data, city=form.city.data, state=form.state.data,
-                      address=form.address.data, phone=form.phone.data,
-                      image_link=form.image_link.data, facebook_link=form.facebook_link.data,
+        venue = Venue(name=form.name.data,
+                      city=form.city.data,
+                      state=form.state.data,
+                      address=form.address.data,
+                      phone=form.phone.data,
+                      image_link=form.image_link.data,
+                      facebook_link=form.facebook_link.data,
                       website=form.website_link.data,
-                      genres=form.genres.data, seeking_talent=form.seeking_talent.data,
+                      genres=json.dumps(form.genres.data),
+                      seeking_talent=form.seeking_talent.data,
                       seeking_description=form.seeking_description.data)
         # print(venue)
+        jsoned = json.dumps(form.genres.data)
+        print(jsoned, type(jsoned))
+        print(form.genres.data)
         db.session.add(venue)
         db.session.commit()
         # on successful db insert, flash success
@@ -339,7 +333,7 @@ def artists():
     # DONE: replace with real data returned from querying the database
     result = []
     for artist in Artist.query.order_by('id').all():
-        result.append({'id':artist.id,'name':artist.name})
+        result.append({'id': artist.id, 'name': artist.name})
     data = [{
         "id": 4,
         "name": "Guns N Petals",
@@ -355,17 +349,27 @@ def artists():
 
 @app.route('/artists/search', methods=['POST'])
 def search_artists():
-    # TODO: implement search on artists with partial string search. Ensure it is case-insensitive.
+    # DONE: implement search on artists with partial string search. Ensure it is case-insensitive.
     # seach for "A" should return "Guns N Petals", "Matt Quevado", and "The Wild Sax Band".
     # search for "band" should return "The Wild Sax Band".
-    response = {
-        "count": 1,
-        "data": [{
-            "id": 4,
-            "name": "Guns N Petals",
-            "num_upcoming_shows": 0,
-        }]
-    }
+    search_term = f"%{request.form.get('search_term', '')}%"
+    search_result = Artist.query.filter(Artist.name.ilike(search_term)).all()
+    # print(len(search_result))
+    data = []
+    for result in search_result:
+        data.append({'id': result.id,
+                     'name': result.name,
+                     'num_upcoming_shows': len(result.shows)})
+    response = {'count': len(search_result),
+                'data': data}
+    # response = {
+    #     "count": 1,
+    #     "data": [{
+    #         "id": 4,
+    #         "name": "Guns N Petals",
+    #         "num_upcoming_shows": 0,
+    #     }]
+    # }
     return render_template('pages/search_artists.html', results=response,
                            search_term=request.form.get('search_term', ''))
 
@@ -373,80 +377,122 @@ def search_artists():
 @app.route('/artists/<int:artist_id>')
 def show_artist(artist_id):
     # shows the artist page with the given artist_id
-    # TODO: replace with real artist data from the artist table, using artist_id
-    data1 = {
-        "id": 4,
-        "name": "Guns N Petals",
-        "genres": ["Rock n Roll"],
-        "city": "San Francisco",
-        "state": "CA",
-        "phone": "326-123-5000",
-        "website": "https://www.gunsnpetalsband.com",
-        "facebook_link": "https://www.facebook.com/GunsNPetals",
-        "seeking_venue": True,
-        "seeking_description": "Looking for shows to perform at in the San Francisco Bay Area!",
-        "image_link": "https://images.unsplash.com/photo-1549213783-8284d0336c4f?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=300&q=80",
-        "past_shows": [{
-            "venue_id": 1,
-            "venue_name": "The Musical Hop",
-            "venue_image_link": "https://images.unsplash.com/photo-1543900694-133f37abaaa5?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=400&q=60",
-            "start_time": "2019-05-21T21:30:00.000Z"
-        }],
-        "upcoming_shows": [],
-        "past_shows_count": 1,
-        "upcoming_shows_count": 0,
+    # DONE: replace with real artist data from the artist table, using artist_id
+    artist = Artist.query.get(artist_id)
+    past_shows = []
+    future_and_present_shows = []
+    for show in artist.shows:
+        date = show.start_time
+        if isinstance(show.start_time, str):
+            date = dateutil.parser.parse(show.start_time)
+        if date < datetime.now():
+            # past show
+            past_shows.append({
+                "venue_id": show.venue_id,
+                "venue_name": Venue.query.get(show.venue_id).name,
+                "venue_image_link": Venue.query.get(show.venue_id).image_link,
+                "start_time": show.start_time
+            })
+        else:
+            future_and_present_shows.append({
+                "venue_id": show.venue_id,
+                "venue_name": Venue.query.get(show.venue_id).name,
+                "venue_image_link": Venue.query.get(show.venue_id).image_link,
+                "start_time": show.start_time})
+    # print(json.dumps(''))
+    # print(venue.genres)
+    # print(len(venue.genres[1:-1].split(', ')))
+    # print(venue.genres[1:-1].split(', '),type(venue.genres),)
+    result = {
+        "id": artist.id,
+        "name": artist.name,
+        "genres": json.loads(artist.genres),
+        "city": artist.city,
+        "state": artist.state,
+        "phone": artist.phone,
+        "website": artist.website,
+        "facebook_link": artist.facebook_link,
+        "seeking_venue": artist.seeking_venue,
+        "seeking_description": artist.seeking_description,
+        "image_link": artist.image_link,
+        "past_shows": past_shows,
+        "upcoming_shows": future_and_present_shows,
+        "past_shows_count": len(past_shows),
+        "upcoming_shows_count": len(future_and_present_shows),
     }
-    data2 = {
-        "id": 5,
-        "name": "Matt Quevedo",
-        "genres": ["Jazz"],
-        "city": "New York",
-        "state": "NY",
-        "phone": "300-400-5000",
-        "facebook_link": "https://www.facebook.com/mattquevedo923251523",
-        "seeking_venue": False,
-        "image_link": "https://images.unsplash.com/photo-1495223153807-b916f75de8c5?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=334&q=80",
-        "past_shows": [{
-            "venue_id": 3,
-            "venue_name": "Park Square Live Music & Coffee",
-            "venue_image_link": "https://images.unsplash.com/photo-1485686531765-ba63b07845a7?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=747&q=80",
-            "start_time": "2019-06-15T23:00:00.000Z"
-        }],
-        "upcoming_shows": [],
-        "past_shows_count": 1,
-        "upcoming_shows_count": 0,
-    }
-    data3 = {
-        "id": 6,
-        "name": "The Wild Sax Band",
-        "genres": ["Jazz", "Classical"],
-        "city": "San Francisco",
-        "state": "CA",
-        "phone": "432-325-5432",
-        "seeking_venue": False,
-        "image_link": "https://images.unsplash.com/photo-1558369981-f9ca78462e61?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=794&q=80",
-        "past_shows": [],
-        "upcoming_shows": [{
-            "venue_id": 3,
-            "venue_name": "Park Square Live Music & Coffee",
-            "venue_image_link": "https://images.unsplash.com/photo-1485686531765-ba63b07845a7?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=747&q=80",
-            "start_time": "2035-04-01T20:00:00.000Z"
-        }, {
-            "venue_id": 3,
-            "venue_name": "Park Square Live Music & Coffee",
-            "venue_image_link": "https://images.unsplash.com/photo-1485686531765-ba63b07845a7?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=747&q=80",
-            "start_time": "2035-04-08T20:00:00.000Z"
-        }, {
-            "venue_id": 3,
-            "venue_name": "Park Square Live Music & Coffee",
-            "venue_image_link": "https://images.unsplash.com/photo-1485686531765-ba63b07845a7?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=747&q=80",
-            "start_time": "2035-04-15T20:00:00.000Z"
-        }],
-        "past_shows_count": 0,
-        "upcoming_shows_count": 3,
-    }
-    data = list(filter(lambda d: d['id'] == artist_id, [data1, data2, data3]))[0]
-    return render_template('pages/show_artist.html', artist=data)
+    # data1 = {
+    #     "id": 4,
+    #     "name": "Guns N Petals",
+    #     "genres": ["Rock n Roll"],
+    #     "city": "San Francisco",
+    #     "state": "CA",
+    #     "phone": "326-123-5000",
+    #     "website": "https://www.gunsnpetalsband.com",
+    #     "facebook_link": "https://www.facebook.com/GunsNPetals",
+    #     "seeking_venue": True,
+    #     "seeking_description": "Looking for shows to perform at in the San Francisco Bay Area!",
+    #     "image_link": "https://images.unsplash.com/photo-1549213783-8284d0336c4f?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=300&q=80",
+    #     "past_shows": [{
+    #         "venue_id": 1,
+    #         "venue_name": "The Musical Hop",
+    #         "venue_image_link": "https://images.unsplash.com/photo-1543900694-133f37abaaa5?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=400&q=60",
+    #         "start_time": "2019-05-21T21:30:00.000Z"
+    #     }],
+    #     "upcoming_shows": [],
+    #     "past_shows_count": 1,
+    #     "upcoming_shows_count": 0,
+    # }
+    # data2 = {
+    #     "id": 5,
+    #     "name": "Matt Quevedo",
+    #     "genres": ["Jazz"],
+    #     "city": "New York",
+    #     "state": "NY",
+    #     "phone": "300-400-5000",
+    #     "facebook_link": "https://www.facebook.com/mattquevedo923251523",
+    #     "seeking_venue": False,
+    #     "image_link": "https://images.unsplash.com/photo-1495223153807-b916f75de8c5?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=334&q=80",
+    #     "past_shows": [{
+    #         "venue_id": 3,
+    #         "venue_name": "Park Square Live Music & Coffee",
+    #         "venue_image_link": "https://images.unsplash.com/photo-1485686531765-ba63b07845a7?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=747&q=80",
+    #         "start_time": "2019-06-15T23:00:00.000Z"
+    #     }],
+    #     "upcoming_shows": [],
+    #     "past_shows_count": 1,
+    #     "upcoming_shows_count": 0,
+    # }
+    # data3 = {
+    #     "id": 6,
+    #     "name": "The Wild Sax Band",
+    #     "genres": ["Jazz", "Classical"],
+    #     "city": "San Francisco",
+    #     "state": "CA",
+    #     "phone": "432-325-5432",
+    #     "seeking_venue": False,
+    #     "image_link": "https://images.unsplash.com/photo-1558369981-f9ca78462e61?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=794&q=80",
+    #     "past_shows": [],
+    #     "upcoming_shows": [{
+    #         "venue_id": 3,
+    #         "venue_name": "Park Square Live Music & Coffee",
+    #         "venue_image_link": "https://images.unsplash.com/photo-1485686531765-ba63b07845a7?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=747&q=80",
+    #         "start_time": "2035-04-01T20:00:00.000Z"
+    #     }, {
+    #         "venue_id": 3,
+    #         "venue_name": "Park Square Live Music & Coffee",
+    #         "venue_image_link": "https://images.unsplash.com/photo-1485686531765-ba63b07845a7?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=747&q=80",
+    #         "start_time": "2035-04-08T20:00:00.000Z"
+    #     }, {
+    #         "venue_id": 3,
+    #         "venue_name": "Park Square Live Music & Coffee",
+    #         "venue_image_link": "https://images.unsplash.com/photo-1485686531765-ba63b07845a7?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=747&q=80",
+    #         "start_time": "2035-04-15T20:00:00.000Z"
+    #     }],
+    #     "past_shows_count": 0,
+    #     "upcoming_shows_count": 3,
+    # }
+    # data = list(filter(lambda d: d['id'] == artist_id, [data1, data2, data3]))[0]
+    return render_template('pages/show_artist.html', artist=result)
 
 
 #  Update
@@ -533,7 +579,8 @@ def create_artist_submission():
                         phone=form.phone.data,
                         image_link=form.image_link.data, facebook_link=form.facebook_link.data,
                         website=form.website_link.data,
-                        genres=form.genres.data, seeking_venue=form.seeking_venue.data,
+                        genres=json.dumps(form.genres.data),
+                        seeking_venue=form.seeking_venue.data,
                         seeking_description=form.seeking_description.data)
         print(artist)
         db.session.add(artist)
@@ -564,12 +611,12 @@ def shows():
     result = []
     for show in Show.query.order_by('id').all():
         print(Venue.query.get(show.venue_id).name)
-        result.append({'venue_id':show.venue_id,
-                       'venue_name':Venue.query.get(show.venue_id).name,
-                       'artist_id':show.artist_id,
-                       'artist_name':Artist.query.get(show.artist_id).name,
-                       'artist_image_link':Artist.query.get(show.artist_id).image_link,
-                       'start_time':show.start_time})
+        result.append({'venue_id': show.venue_id,
+                       'venue_name': Venue.query.get(show.venue_id).name,
+                       'artist_id': show.artist_id,
+                       'artist_name': Artist.query.get(show.artist_id).name,
+                       'artist_image_link': Artist.query.get(show.artist_id).image_link,
+                       'start_time': show.start_time})
     print(result)
     data = [{
         "venue_id": 1,
